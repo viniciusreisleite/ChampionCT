@@ -28,6 +28,7 @@
       gap: 2.5vw;
     }
 
+    /* Coluna de Vídeo */
     .video-section {
       flex: 0 0 35%;
       height: 100%;
@@ -61,6 +62,7 @@
       transition: width 0.1s linear;
     }
 
+    /* Coluna Informativa */
     .info-section {
       flex: 1;
       height: 100%;
@@ -75,6 +77,7 @@
       overflow: hidden;
     }
 
+    /* Cabeçalho */
     .header {
       display: flex;
       justify-content: space-between;
@@ -117,6 +120,7 @@
       filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.7));
     }
 
+    /* Área de Texto Auto-Ajustável */
     .caption-container {
       flex: 1;
       margin-top: 2vh;
@@ -141,7 +145,7 @@
 
   <div class="tv-container">
     <div class="video-section">
-      <video id="player" autoplay playsinline muted>
+      <video id="player" autoplay playsinline muted preload="auto">
         <source id="video-source" src="video_1.mp4" type="video/mp4">
       </video>
       <div class="progress-bar-container">
@@ -176,6 +180,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const postId = parseInt(urlParams.get('post')) || 1;
 
+    let retryCount = 0;
+    const maxRetries = 10;
+
     function autoFitTextExact() {
       const containerW = captionContainer.clientWidth;
       const containerH = captionContainer.clientHeight;
@@ -205,6 +212,24 @@
       captionText.style.fontSize = optimal + 'px';
       captionText.style.lineHeight = (optimal * 1.35) + 'px';
     }
+
+    // Reconexão inteligente contra instabilidades de internet
+    function recoverVideoPlayback() {
+      if (retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(() => {
+          player.load();
+          player.play().catch(() => {});
+        }, 3000);
+      }
+    }
+
+    player.addEventListener('error', recoverVideoPlayback);
+    player.addEventListener('stalled', recoverVideoPlayback);
+    player.addEventListener('waiting', recoverVideoPlayback);
+    player.addEventListener('playing', () => {
+      retryCount = 0;
+    });
 
     async function loadPostData() {
       const timestamp = new Date().getTime();
