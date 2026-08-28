@@ -96,7 +96,7 @@ def main():
 
         browser.close()
 
-    print(f"\nTotal de posts localizados: {len(reels_urls)}")
+    print(f"\nTotal de posts cronológicos localizados: {len(reels_urls)}")
 
     if not reels_urls:
         print("❌ Nenhum post foi identificado.")
@@ -108,6 +108,7 @@ def main():
     for idx, reel_url in enumerate(reels_urls[:target_count], start=1):
         print(f"\n--- Processando Post #{idx}: {reel_url} ---")
         output_filename = f"video_{idx}.mp4"
+        temp_raw = f"temp_raw_{idx}.mp4"
 
         caption = ""
         try:
@@ -125,17 +126,37 @@ def main():
         except Exception as e:
             print(f"Erro ao capturar legenda: {e}")
 
-        cmd = [
+        # 1. Download do vídeo bruto
+        cmd_download = [
             "yt-dlp",
             "--cookies", cookie_file,
             "--no-check-certificates",
-            "--merge-output-format", "mp4",
             "-f", "bestvideo+bestaudio/best",
-            "-o", output_filename,
+            "-o", temp_raw,
             "--force-overwrites",
             reel_url
         ]
-        subprocess.run(cmd, capture_output=True, text=True)
+        subprocess.run(cmd_download, capture_output=True, text=True)
+
+        # 2. Compressão otimizada com FFmpeg (720p, H.264 leve e FastStart)
+        if os.path.exists(temp_raw):
+            cmd_ffmpeg = [
+                "ffmpeg", "-y",
+                "-i", temp_raw,
+                "-vf", "scale='min(720,iw)':-2",
+                "-c:v", "libx264",
+                "-crf", "26",
+                "-preset", "veryfast",
+                "-c:a", "aac",
+                "-b:a", "96k",
+                "-movflags", "+faststart",
+                output_filename
+            ]
+            subprocess.run(cmd_ffmpeg, capture_output=True, text=True)
+            try:
+                os.remove(temp_raw)
+            except Exception:
+                pass
 
         posts_data.append({
             "id": idx,
@@ -153,7 +174,7 @@ def main():
     if os.path.exists(cookie_file):
         os.remove(cookie_file)
 
-    print("\n✅ Concluído! 8 posts cronológicos baixados com sucesso.")
+    print("\n✅ Concluído! Vídeos comprimidos em 720p e salvos com sucesso.")
 
 if __name__ == "__main__":
     main()
