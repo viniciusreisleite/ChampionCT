@@ -180,6 +180,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const postId = parseInt(urlParams.get('post')) || 1;
 
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 5;
+
     function autoFitTextExact() {
       const containerW = captionContainer.clientWidth;
       const containerH = captionContainer.clientHeight;
@@ -210,17 +213,27 @@
       captionText.style.lineHeight = (optimal * 1.35) + 'px';
     }
 
-    // Tratamento seguro apenas para erro real de download
-    let isRetrying = false;
+    // Tratamento de falhas com recarregamento da página após 5 tentativas
     player.addEventListener('error', () => {
-      if (!isRetrying) {
-        isRetrying = true;
+      consecutiveErrors++;
+      console.log(`Falha no vídeo (${consecutiveErrors}/${maxConsecutiveErrors})`);
+
+      if (consecutiveErrors >= maxConsecutiveErrors) {
+        console.log('Limite de erros atingido. Recarregando a página inteira...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } else {
         setTimeout(() => {
           player.load();
           player.play().catch(() => {});
-          isRetrying = false;
         }, 3000);
       }
+    });
+
+    // Quando o vídeo toca com sucesso, reseta o contador de erros
+    player.addEventListener('playing', () => {
+      consecutiveErrors = 0;
     });
 
     async function loadPostData() {
@@ -254,7 +267,6 @@
       }
     });
 
-    // Quando o vídeo termina normalmente, reinicia com suavidade
     player.addEventListener('ended', () => {
       player.currentTime = 0;
       player.play().catch(e => console.log('Erro ao reiniciar:', e));
