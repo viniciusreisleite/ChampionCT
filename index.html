@@ -3,144 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mural Digital - Champion CT</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <title>Mural - Champion CT</title>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    body {
-      background: radial-gradient(circle at top right, #18181b, #09090b);
-      color: #ffffff;
-      font-family: 'Montserrat', sans-serif;
-      width: 100vw;
-      height: 100vh;
+    body, html {
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      display: flex;
+      background-color: #0d0d0d;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     .tv-container {
       display: flex;
-      width: 100%;
-      height: 100%;
-      padding: 3vh 2.5vw;
-      gap: 2.5vw;
+      width: 100vw;
+      height: 100vh;
+      background-color: #0d0d0d;
     }
-
-    /* Coluna de Vídeo */
     .video-section {
-      flex: 0 0 35%;
-      height: 100%;
-      background: #000;
-      border-radius: 26px;
+      flex: 0 0 42%;
+      height: 100vh;
+      background: #000 !important;
+      background-color: #000 !important;
+      position: relative;
       overflow: hidden;
-      box-shadow: 0 20px 45px rgba(0,0,0,0.85);
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      border: 2px solid rgba(220, 38, 38, 0.4);
     }
-    video, 
-    .progress-bar-container {
-      position: absolute;
-      bottom: 0;
-      left: 0;
+    video {
       width: 100%;
-      height: 8px;
-      background: rgba(255, 255, 255, 0.15);
-    }
-    .progress-bar {
       height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #dc2626, #ef4444);
-      transition: width 0.1s linear;
-    }
-
-    /* Coluna Informativa */
-    .info-section {
-      flex: 1;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(18px);
-      border: 1px solid rgba(220, 38, 38, 0.25);
-      border-radius: 26px;
-      padding: 3.5vh 3vw;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
-    }
-
-    /* Cabeçalho */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 25px;
-      padding-bottom: 2vh;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-    }
-    .header-text {
-      flex: 1;
-    }
-    .badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #b91c1c, #dc2626);
-      color: #ffffff;
-      font-size: clamp(0.75rem, 1vw, 1.05rem);
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      padding: 6px 18px;
-      border-radius: 50px;
-      margin-bottom: 1vh;
-      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
-    }
-    .header h1 {
-      font-size: clamp(1.4rem, 2.2vw, 2.6rem);
-      font-weight: 900;
-      line-height: 1.2;
-      color: #f8fafc;
-      letter-spacing: -0.5px;
-    }
-    .header h1 span {
-      color: #ef4444;
-    }
-
-    .logo-img {
-      height: clamp(85px, 14vh, 140px);
-      max-width: 260px;
-      object-fit: contain;
-      filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.7));
-    }
-
-    /* Área de Texto Auto-Ajustável */
-    
-    
-      
-    video, #image-player {
+      object-fit: contain !important;
       background: #000 !important;
       background-color: #000 !important;
+      display: block;
     }
-      .header-text h1, .header h1 {
-      text-transform: uppercase !important;
-}
-      /* Motor TV Standard 2026 */
-    .header-text h1, .header h1 {
-      text-transform: uppercase !important;
-    }
-    .header-text h1 span, .header h1 span {
-      text-transform: uppercase !important;
+    #image-player {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+      background: #000 !important;
+      background-color: #000 !important;
+      display: block;
     }
     .info-section {
+      flex: 1;
       height: 100vh !important;
       max-height: 100vh !important;
       display: flex !important;
       flex-direction: column !important;
+      padding: 3rem;
+      background-color: #141414;
+      color: #fff;
       overflow: hidden !important;
       box-sizing: border-box !important;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #262626;
+      padding-bottom: 1.5rem;
+      flex-shrink: 0;
+    }
+    .header-text .badge {
+      display: inline-block;
+      padding: 0.35rem 1rem;
+      font-size: 1rem;
+      font-weight: 800;
+      border-radius: 50px;
+      text-transform: uppercase !important;
+      letter-spacing: 1px;
+      background: #dc2626;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .header-text h1 {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1.1;
+      text-transform: uppercase !important;
+    }
+    .header-text h1 span {
+      color: #dc2626;
+      text-transform: uppercase !important;
+    }
+    .logo-img {
+      max-height: 90px;
+      max-width: 180px;
+      object-fit: contain;
     }
     .caption-container {
       flex: 1 1 auto !important;
@@ -163,44 +119,25 @@
       white-space: pre-line !important;
       padding-bottom: 6rem !important;
     }
-    video, #image-player {
-      background: #000 !important;
-      background-color: #000 !important;
-    }
-      #image-player {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: contain !important;
-      background: #000 !important;
-      background-color: #000 !important;
-    }
-      video {
-      object-fit: contain !important;
-      background: #000 !important;
-      background-color: #000 !important;
-    }
   </style>
 </head>
 <body>
 
   <div class="tv-container">
     <div class="video-section">
-      <img id="image-player" style="display:none; width:100%; height:100%; object-fit:contain; background-color:#050505;" />
-        <video id="player" autoplay playsinline muted loop preload="auto">
-        <source id="video-source" src="video_1.mp4" type="video/mp4">
+      <img id="image-player" style="display:none;" />
+      <video id="player" autoplay playsinline muted loop preload="auto">
+        <source id="video-source" src="" type="video/mp4">
       </video>
-      <div class="progress-bar-container">
-        <div class="progress-bar" id="progress"></div>
-      </div>
     </div>
 
     <div class="info-section">
       <div class="header">
         <div class="header-text">
-          <span class="badge">Experiência Premium</span>
+          <span class="badge">Centro de Treinamento</span>
           <h1>Champion <span>CT</span></h1>
         </div>
-        <img src="logo.png" alt="Logo Champion CT" class="logo-img" onerror="this.style.display='none'">
+        <img src="logo.png" alt="Logo" class="logo-img" onerror="this.style.display='none'">
       </div>
 
       <div class="caption-container" id="caption-container">
@@ -211,7 +148,7 @@
     </div>
   </div>
 
-      <script>
+  <script>
     function iniciarAutoScroll(container) {
       if (!container) return;
       if (window.__scrollInterval) clearInterval(window.__scrollInterval);
@@ -310,6 +247,8 @@
             if (player && videoSource) {
               player.style.display = 'block';
               player.style.backgroundColor = '#000';
+              player.muted = true;
+              player.defaultMuted = true;
               player.loop = true;
 
               player.onended = function() {
@@ -317,9 +256,13 @@
                 player.play().catch(function() {});
               };
 
-              videoSource.src = midiaArquivo + '?v=' + ts;
+              var mediaUrl = midiaArquivo + '?v=' + ts;
+              videoSource.src = mediaUrl;
+              player.src = mediaUrl;
               player.load();
-              player.play().catch(function(e) { console.log('Autoplay:', e); });
+              player.play().catch(function(e) {
+                console.log('Autoplay tentado:', e);
+              });
             }
           }
         })
