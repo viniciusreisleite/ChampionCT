@@ -30,21 +30,33 @@
     /* Configuração padrão do card de mídia */
     .video-section {
       height: 100% !important;
+      aspect-ratio: 9 / 16 !important;
+      flex: 0 0 auto !important;
       background: #000 !important;
-      border-radius: 24px !important;
+      border-radius: 26px !important;
       overflow: hidden !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
-      border: 1px solid rgba(255, 255, 255, 0.1) !important;
       position: relative !important;
+      border: 3px solid rgba(255, 255, 255, 0.1) !important;
     }
 
     /* QUANDO FOR VÍDEO (Reels 9:16): enquadramento perfeito sem faixas */
     .tv-container.is-video .video-section {
+      height: 100% !important;
+      aspect-ratio: 9 / 16 !important;
       flex: 0 0 auto !important;
-      aspect-ratio: auto !important; width: auto !important;
+      background: #000 !important;
+      border-radius: 26px !important;
+      overflow: hidden !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative !important;
+      border: 3px solid rgba(255, 255, 255, 0.1) !important;
     }
     .tv-container.is-video video {
       width: auto !important;
@@ -58,9 +70,18 @@
 
     /* QUANDO FOR FOTO (1:1 ou 4:5): foto 100% inteira sem zoom e sem cortar laterais */
     .tv-container.is-image .video-section {
+      height: 100% !important;
+      aspect-ratio: 9 / 16 !important;
       flex: 0 0 auto !important;
-      max-width: 45vw !important;
-      background: #050505 !important;
+      background: #000 !important;
+      border-radius: 26px !important;
+      overflow: hidden !important;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative !important;
+      border: 3px solid rgba(255, 255, 255, 0.1) !important;
     }
     .tv-container.is-image #image-player {
       width: auto !important;
@@ -120,7 +141,7 @@
     .logo-img {
       max-height: 90px;
       max-width: 180px;
-      object-fit: contain;
+      object-fit: cover;
     }
     .caption-container {
       flex: 1 1 auto !important;
@@ -315,4 +336,5 @@
   </script>
 </body>
 </html>
+
 
