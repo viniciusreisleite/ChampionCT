@@ -24,8 +24,43 @@ def baixar_imagem_hd(url, destino):
         pass
     return False
 
+def extrair_imagem_completa(page):
+    """Busca a foto real sem o crop 1:1 de preview do Instagram"""
+    try:
+        # 1. Busca todas as imagens dentro do artigo
+        imgs = page.query_selector_all('article img[srcset], main img[srcset], div[role="dialog"] img[srcset]')
+        melhor_url = None
+        maior_largura = 0
+
+        for im in imgs:
+            srcset = im.get_attribute("srcset")
+            if srcset:
+                # Cada item é: 'https://... 1080w'
+                entradas = srcset.split(",")
+                for entrada in entradas:
+                    partes = entrada.strip().split(" ")
+                    url_candidata = partes[0]
+                    largura = int(partes[1].replace("w", "")) if len(partes) > 1 and "w" in partes[1] else 0
+                    
+                    if largura > maior_largura:
+                        maior_largura = largura
+                        melhor_url = url_candidata
+
+        if melhor_url:
+            return melhor_url
+
+        # 2. Fallback: pega a tag img visível do post
+        single_img = page.query_selector('article div[role="button"] img, article ul li img, article img')
+        if single_img:
+            src = single_img.get_attribute("src")
+            if src and "scontent" in src:
+                return src
+    except Exception:
+        pass
+    return None
+
 def processar_mural():
-    print(f"=== COLETANDO FEED E REELS PARA COMPLETAR 12 SLOTS ===")
+    print(f"=== REPROCESSANDO POSTS COM FOTOS ORIGINAIS (SEM CROP) ===")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -37,8 +72,8 @@ def processar_mural():
 
         candidatos = []
 
-        # 1. Coleta do Feed Principal
-        print(f"1. Acessando feed de @{USER}...")
+        # 1. Feed Principal
+        print(f"Acessando feed de @{USER}...")
         page.goto(f"https://www.instagram.com/{USER}/", wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(2000)
 
@@ -55,9 +90,8 @@ def processar_mural():
             page.evaluate("window.scrollBy(0, 1000)")
             page.wait_for_timeout(400)
 
-        # 2. Se não bateu candidatos suficientes, coleta da aba /reels/
+        # 2. Aba Reels para garantir 12 itens
         if len(candidatos) < TARGET_TOTAL + 4:
-            print(f"2. Acessando aba /reels/ para buscar posts mais antigos...")
             page.goto(f"https://www.instagram.com/{USER}/reels/", wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(2000)
             for _ in range(15):
@@ -73,8 +107,6 @@ def processar_mural():
                 page.evaluate("window.scrollBy(0, 1200)")
                 page.wait_for_timeout(400)
 
-        print(f"Total de URLs candidatas disponíveis: {len(candidatos)}")
-
         dados_finais = []
         slot_atual = 1
 
@@ -86,7 +118,6 @@ def processar_mural():
             arquivo_existente = None
             tipo_existente = "video"
             
-            # Checa se este slot ja esta salvo no disco com integridade
             for ext, tp in [(".mp4", "video"), (".jpg", "image")]:
                 teste = f"media_{slot_atual}{ext}"
                 if os.path.exists(teste) and os.path.getsize(teste) > 10000:
@@ -102,29 +133,21 @@ def processar_mural():
             if meta_tag:
                 caption = meta_tag.get_attribute("content") or ""
 
-            # Se ja temos o arquivo local no slot 1 a 9, apenas confirma os dados
-            if arquivo_existente and slot_atual <= 9:
-                print(f"  [SLOT {slot_atual} JÁ EXISTE] {arquivo_existente}")
+            # Se for vídeo e já existir intacto no disco (slots 2 a 5, 7 a 9), mantém
+            if arquivo_existente and tipo_existente == "video":
+                print(f"  [SLOT {slot_atual} OK] {arquivo_existente}")
                 dados_finais.append({
-                    "id": sc,
-                    "url": url,
-                    "caption": caption,
-                    "text": caption,
-                    "type": tipo_existente,
-                    "tipo": tipo_existente,
-                    "media": arquivo_existente,
-                    "media_file": arquivo_existente,
-                    "video_file": arquivo_existente,
-                    "arquivo": arquivo_existente,
-                    "badge": "CENTRO DE TREINAMENTO",
-                    "cor": "#ff1744",
-                    "perfil": USER
+                    "id": sc, "url": url, "caption": caption, "text": caption,
+                    "type": tipo_existente, "tipo": tipo_existente,
+                    "media": arquivo_existente, "media_file": arquivo_existente,
+                    "video_file": arquivo_existente, "arquivo": arquivo_existente,
+                    "badge": "CENTRO DE TREINAMENTO", "cor": "#ff1744", "perfil": USER
                 })
                 slot_atual += 1
                 continue
 
-            # Baixa os novos slots (10, 11 e 12)
-            print(f"\n[{slot_atual}/{TARGET_TOTAL}] Baixando novo: {url}")
+            # Baixa novo ou refaz foto em resolução original
+            print(f"\n[{slot_atual}/{TARGET_TOTAL}] Baixando mídia completa: {url}")
             sucesso = False
             tipo = "image"
             arquivo_final = None
@@ -155,41 +178,24 @@ def processar_mural():
                 except Exception:
                     sucesso = False
 
+            # Se for foto, usa o extrator de imagem completa (sem crop quadrado)
             if not sucesso:
                 tipo = "image"
                 arquivo_final = f"media_{slot_atual}.jpg"
-                img_url = None
-                imgs = page.query_selector_all('article img[srcset], main img[srcset]')
-                for im in imgs:
-                    srcset = im.get_attribute("srcset")
-                    if srcset:
-                        cand = [s.strip().split(" ")[0] for s in srcset.split(",")]
-                        if cand:
-                            img_url = cand[-1]
-                            break
-                if not img_url:
-                    meta_img = page.query_selector('meta[property="og:image"]')
-                    if meta_img:
-                        img_url = meta_img.get_attribute("content")
-                if img_url and baixar_imagem_hd(img_url, arquivo_final):
+                img_hd_url = extrair_imagem_completa(page)
+                
+                if img_hd_url and baixar_imagem_hd(img_hd_url, arquivo_final):
                     sucesso = True
 
             if sucesso and arquivo_final and os.path.exists(arquivo_final):
-                print(f"  -> Salvo: {arquivo_final} ({tipo})")
+                tam_kb = os.path.getsize(arquivo_final) / 1024
+                print(f"  -> Salvo slot {slot_atual}: {arquivo_final} ({tipo} - {tam_kb:.1f} KB)")
                 dados_finais.append({
-                    "id": sc,
-                    "url": url,
-                    "caption": caption,
-                    "text": caption,
-                    "type": tipo,
-                    "tipo": tipo,
-                    "media": arquivo_final,
-                    "media_file": arquivo_final,
-                    "video_file": arquivo_final,
-                    "arquivo": arquivo_final,
-                    "badge": "CENTRO DE TREINAMENTO",
-                    "cor": "#ff1744",
-                    "perfil": USER
+                    "id": sc, "url": url, "caption": caption, "text": caption,
+                    "type": tipo, "tipo": tipo,
+                    "media": arquivo_final, "media_file": arquivo_final,
+                    "video_file": arquivo_final, "arquivo": arquivo_final,
+                    "badge": "CENTRO DE TREINAMENTO", "cor": "#ff1744", "perfil": USER
                 })
                 slot_atual += 1
 
