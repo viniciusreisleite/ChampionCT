@@ -97,7 +97,7 @@ def processar_mural():
             page.wait_for_timeout(2000)
             urls_encontradas = []
 
-            for _ in range(8):
+            for _ in range(25):
                 anchors = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
                 for a in anchors:
                     href = a.get_attribute("href")
