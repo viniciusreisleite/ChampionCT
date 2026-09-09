@@ -1,4 +1,4 @@
-﻿import os, sys, json, time, re
+﻿import os, sys, json, time, re, shutil
 import requests
 from playwright.sync_api import sync_playwright
 import yt_dlp
@@ -6,19 +6,43 @@ import yt_dlp
 TARGET = 12
 USER = "championct_"
 DATA_JSON = "data.json"
-COOKIES = "cookies.txt"
+COOKIES_FILE = "cookies.txt"
 
-# Shortcodes ou URLs explicitamente fixados para ignorar sumariamente
-SHORTCODES_FIXADOS = {
-    "DalHQ6aRQor",  # Vídeo "Há 3 anos escolhemos..."
-    "DVTXFY1jRa9",  # Fixado institucional 2
-    "DSqRcsEDsaY"   # Fixado institucional 3
-}
+SHORTCODES_FIXADOS = {"DalHQ6aRQor", "DVTXFY1jRa9", "DSqRcsEDsaY"}
 
-def baixar_foto(url, destino):
+def carregar_cookies_playwright(context):
+    if not os.path.exists(COOKIES_FILE):
+        return
+    cookies_pw = []
+    with open(COOKIES_FILE, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.strip().split("\t")
+            if len(parts) >= 7:
+                cookies_pw.append({
+                    "domain": parts[0] if parts[0].startswith(".") else f".{parts[0]}",
+                    "path": parts[2],
+                    "secure": parts[3].lower() == "true",
+                    "expires": int(parts[4]) if parts[4].isdigit() else int(time.time()) + 86400,
+                    "name": parts[5],
+                    "value": parts[6]
+                })
+    if cookies_pw:
+        try:
+            context.add_cookies(cookies_pw)
+            print("  [AUTH] Cookies injetados com sucesso.")
+        except Exception as e:
+            print(f"  [AUTH AVISO] Erro ao carregar cookies: {e}")
+
+def extrair_code(url):
+    m = re.search(r'/(?:p|reel|tv)/([^/?#&]+)', url)
+    return m.group(1) if m else ""
+
+def baixar_foto_real(url, destino):
     try:
-        r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200 and len(r.content) > 3000:
+        r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        if r.status_code == 200 and len(r.content) > 25000: # Exige > 25KB para ser foto HD real
             with open(destino, "wb") as f:
                 f.write(r.content)
             return True
@@ -26,84 +50,80 @@ def baixar_foto(url, destino):
         pass
     return False
 
-def extrair_code(url):
-    m = re.search(r'/(?:p|reel|tv)/([^/?#&]+)', url)
-    return m.group(1) if m else ""
-
 def run():
-    print(f"=== BAIXANDO EXCLUSIVAMENTE RECENTES CRONOLÓGICOS DE @{USER} ===")
+    print(f"=== BAIXANDO 12 POSTS REAIS E RECENTES DE @{USER} ===")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 900}
+        )
+        carregar_cookies_playwright(context)
         page = context.new_page()
 
-        # 1. Acessa o feed principal
-        print(f"Acessando feed de @{USER}...")
+        print(f"Acessando perfil de @{USER}...")
         page.goto(f"https://www.instagram.com/{USER}/", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(2500)
-        
-        candidatos_urls = []
-        for _ in range(40):
+        page.wait_for_timeout(3000)
+
+        # Fecha popup de login se houver
+        try:
+            btn_close = page.query_selector('svg[aria-label="Fechar"], div[role="dialog"] button')
+            if btn_close:
+                btn_close.click()
+        except:
+            pass
+
+        # Coleta URLs rolando com persistência
+        candidatos = []
+        for tentativa in range(25):
             links = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
             for l in links:
                 h = l.get_attribute("href")
-                if h:
-                    code = extrair_code(h)
-                    if code and code not in SHORTCODES_FIXADOS:
-                        # Detecta visualmente se o elemento tem pino caso haja outro fixado novo
-                        card_html = l.inner_html().lower()
-                        if "pin" in card_html or "fixado" in card_html:
-                            continue
-                        
-                        full_url = f"https://www.instagram.com/{USER}/reel/{code}/" if "/reel/" in h else f"https://www.instagram.com/{USER}/p/{code}/"
-                        if full_url not in candidatos_urls:
-                            candidatos_urls.append(full_url)
-
-            if len(candidatos_urls) >= 30:
+                if not h:
+                    continue
+                code = extrair_code(h)
+                if code and code not in SHORTCODES_FIXADOS:
+                    full = f"https://www.instagram.com/{USER}/reel/{code}/" if "/reel/" in h else f"https://www.instagram.com/{USER}/p/{code}/"
+                    if full not in candidatos:
+                        candidatos.append(full)
+            if len(candidatos) >= 16:
                 break
-            page.evaluate("window.scrollBy(0, 1200)")
-            page.wait_for_timeout(600)
+            page.evaluate("window.scrollBy(0, 1500)")
+            page.wait_for_timeout(800)
 
-        print(f"Total de posts filtrados (sem fixados): {len(candidatos_urls)}")
+        print(f"Posts cronológicos identificados: {len(candidatos)}")
 
         dados_finais = []
         slot = 1
 
-        for url in candidatos_urls:
+        for url in candidatos:
             if slot > TARGET:
                 break
 
             code = extrair_code(url)
             print(f"\n[{slot}/{TARGET}] Processando: {url}")
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(2000)
 
-            # Valida autor para não puxar feed pessoal
-            autor_header = page.query_selector("header")
-            if autor_header:
-                txt = autor_header.inner_text().lower()
-                if "treinadorjhon" in txt and USER not in txt:
-                    print("  -> Post exclusivo do perfil pessoal detectado. Pulando...")
-                    continue
-
-            caption = ""
-            meta_tag = page.query_selector('meta[property="og:title"]')
-            if meta_tag:
-                caption = meta_tag.get_attribute("content") or ""
-
-            # Verificação extra de texto para evitar posts fixados institucionais
-            if "há 3 anos" in caption.lower() or "be the 1%" in caption.lower() and "fase da champion" in caption.lower():
-                print("  -> Post institucional/fixado detectado por legenda. Pulando...")
+            # Valida autor
+            autor_el = page.query_selector("header")
+            if autor_el and "treinadorjhon" in autor_el.inner_text().lower() and USER not in autor_el.inner_text().lower():
+                print("  -> Post exclusivo pessoal. Ignorando.")
                 continue
 
+            caption = ""
+            meta_title = page.query_selector('meta[property="og:title"]')
+            if meta_title:
+                caption = meta_title.get_attribute("content") or ""
+
             sucesso = False
-            arquivo_destino = None
+            nome_base = f"media_{slot}"
+            arquivo_salvo = None
             tipo = "image"
 
-            # 1. Tenta como vídeo
+            # 1. Tenta baixar como Vídeo com yt-dlp
             if "/reel/" in url or page.query_selector("article video"):
-                nome_base = f"media_{slot}"
                 ydl_opts = {
                     'outtmpl': f'{nome_base}.%(ext)s',
                     'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -112,71 +132,70 @@ def run():
                     'quiet': True,
                     'overwrites': True
                 }
-                if os.path.exists(COOKIES):
-                    ydl_opts['cookiefile'] = COOKIES
+                if os.path.exists(COOKIES_FILE):
+                    ydl_opts['cookiefile'] = COOKIES_FILE
                 try:
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         ydl.download([url])
                     for ext in [".mp4", ".mkv", ".webm"]:
-                        arq_check = f"{nome_base}{ext}"
-                        if os.path.exists(arq_check) and os.path.getsize(arq_check) > 10000:
-                            arquivo_destino = arq_check
+                        arq_c = f"{nome_base}{ext}"
+                        if os.path.exists(arq_c) and os.path.getsize(arq_c) > 20000:
+                            arquivo_salvo = arq_c
                             tipo = "video"
                             sucesso = True
                             break
                 except Exception:
                     sucesso = False
 
-            # 2. Tenta como imagem HD
+            # 2. Se falhar ou for foto (/p/), extrai imagem em resolução real
             if not sucesso:
                 tipo = "image"
-                arquivo_destino = f"media_{slot}.jpg"
+                arquivo_salvo = f"{nome_base}.jpg"
                 img_url = None
 
-                imgs = page.query_selector_all('article img, main img')
+                # Pega a melhor imagem dentro do post
+                imgs = page.query_selector_all('article img[srcset], main img[srcset]')
                 for im in imgs:
-                    srcset = im.get_attribute("srcset")
-                    if srcset:
-                        cands = [s.strip().split(" ")[0] for s in srcset.split(",")]
-                        if cands:
-                            img_url = cands[-1]
+                    ss = im.get_attribute("srcset")
+                    if ss:
+                        lista = [s.strip().split(" ")[0] for s in ss.split(",")]
+                        if lista:
+                            img_url = lista[-1] # Pega a última da lista (maior resolução)
                             break
-                    src = im.get_attribute("src")
-                    if src and "scontent" in src:
-                        img_url = src
-                        break
 
                 if not img_url:
-                    og_img = page.query_selector('meta[property="og:image"]')
-                    if og_img:
-                        img_url = og_img.get_attribute("content")
+                    meta_img = page.query_selector('meta[property="og:image"]')
+                    if meta_img:
+                        img_url = meta_img.get_attribute("content")
 
-                if img_url and baixar_foto(img_url, arquivo_destino):
+                if img_url and baixar_foto_real(img_url, arquivo_salvo):
                     sucesso = True
+                else:
+                    sucesso = False
 
-            if sucesso and arquivo_destino and os.path.exists(arquivo_destino):
-                print(f"  -> Salvo slot {slot}: {arquivo_destino} ({tipo})")
+            if sucesso and arquivo_salvo and os.path.exists(arquivo_salvo):
+                tam_kb = os.path.getsize(arquivo_salvo) / 1024
+                print(f"  -> Sucesso: {arquivo_salvo} ({tipo} - {tam_kb:.1f} KB)")
                 dados_finais.append({
                     "id": code,
                     "url": url,
                     "caption": caption,
                     "tipo": tipo,
-                    "arquivo": arquivo_destino,
+                    "arquivo": arquivo_salvo,
                     "badge": "CHAMPION CT",
                     "cor": "#ff1744",
                     "perfil": USER
                 })
                 slot += 1
+            else:
+                print(f"  -> Falha na captura do post {code}. Indo para o próximo...")
 
         browser.close()
 
-    # Salva json
     with open(DATA_JSON, "w", encoding="utf-8") as f:
         json.dump(dados_finais, f, indent=2, ensure_ascii=False)
 
-    print(f"\nFinalizado! Total de {len(dados_finais)} posts novos salvos (zero posts fixados).")
+    print(f"\nConcluído! Total de {len(dados_finais)} mídias salvas com sucesso.")
 
 if __name__ == "__main__":
     run()
-
-
