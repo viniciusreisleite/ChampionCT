@@ -8,6 +8,13 @@ USER = "championct_"
 DATA_JSON = "data.json"
 COOKIES = "cookies.txt"
 
+# Shortcodes ou URLs explicitamente fixados para ignorar sumariamente
+SHORTCODES_FIXADOS = {
+    "DalHQ6aRQor",  # Vídeo "Há 3 anos escolhemos..."
+    "DVTXFY1jRa9",  # Fixado institucional 2
+    "DSqRcsEDsaY"   # Fixado institucional 3
+}
+
 def baixar_foto(url, destino):
     try:
         r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
@@ -19,76 +26,64 @@ def baixar_foto(url, destino):
         pass
     return False
 
+def extrair_code(url):
+    m = re.search(r'/(?:p|reel|tv)/([^/?#&]+)', url)
+    return m.group(1) if m else ""
+
 def run():
-    print(f"=== BAIXANDO RECENTES (IGNORANDO FIXADOS) DE @{USER} ===")
+    print(f"=== BAIXANDO EXCLUSIVAMENTE RECENTES CRONOLÓGICOS DE @{USER} ===")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
         page = context.new_page()
 
-        url_perfil = f"https://www.instagram.com/{USER}/?hl=pt-br"
-        print(f"Acessando: {url_perfil}")
-        page.goto(url_perfil, wait_until="domcontentloaded", timeout=60000)
+        # 1. Acessa o feed principal
+        print(f"Acessando feed de @{USER}...")
+        page.goto(f"https://www.instagram.com/{USER}/", wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(2500)
         
-        urls_limpas = []
-        for _ in range(18):
-            # Busca cards de links dentro do feed
-            links = page.query_selector_all('article a[href*="/p/"], article a[href*="/reel/"], main a[href*="/p/"], main a[href*="/reel/"]')
+        candidatos_urls = []
+        for _ in range(20):
+            links = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
             for l in links:
                 h = l.get_attribute("href")
-                if not h:
-                    continue
+                if h:
+                    code = extrair_code(h)
+                    if code and code not in SHORTCODES_FIXADOS:
+                        # Detecta visualmente se o elemento tem pino caso haja outro fixado novo
+                        card_html = l.inner_html().lower()
+                        if "pin" in card_html or "fixado" in card_html:
+                            continue
+                        
+                        full_url = f"https://www.instagram.com/{USER}/reel/{code}/" if "/reel/" in h else f"https://www.instagram.com/{USER}/p/{code}/"
+                        if full_url not in candidatos_urls:
+                            candidatos_urls.append(full_url)
 
-                # DETECÇÃO DE POST FIXADO (PIN):
-                # Verifica se dentro do link ou do elemento pai existe indicador de fixado
-                is_pinned = False
-                pinned_el = l.query_selector('svg[aria-label*="Fixado"], svg[aria-label*="Pinned"], title:text("Fixado"), title:text("Pinned")')
-                if not pinned_el:
-                    # Checa o nó ancestral próximo (container da miniatura)
-                    parent = l.evaluate_handle("el => el.closest('div')")
-                    if parent:
-                        chk = parent.as_element().query_selector('svg[aria-label*="Fixado"], svg[aria-label*="Pinned"]')
-                        if chk:
-                            is_pinned = True
-                else:
-                    is_pinned = True
-
-                if is_pinned:
-                    continue
-
-                m = re.search(r'/(p|reel)/([^/?#&]+)', h)
-                if m:
-                    tipo_rota = m.group(1)
-                    code = m.group(2)
-                    url_post = f"https://www.instagram.com/{USER}/{tipo_rota}/{code}/"
-                    if url_post not in urls_limpas:
-                        urls_limpas.append(url_post)
-
-            if len(urls_limpas) >= 20:
+            if len(candidatos_urls) >= 22:
                 break
-            page.evaluate("window.scrollBy(0, 1000)")
+            page.evaluate("window.scrollBy(0, 1200)")
             page.wait_for_timeout(600)
 
-        print(f"Total de posts recentes (sem fixados): {len(urls_limpas)}")
+        print(f"Total de posts filtrados (sem fixados): {len(candidatos_urls)}")
 
         dados_finais = []
         slot = 1
 
-        for url in urls_limpas:
+        for url in candidatos_urls:
             if slot > TARGET:
                 break
 
-            print(f"\n[{slot}/{TARGET}] Processando recente: {url}")
+            code = extrair_code(url)
+            print(f"\n[{slot}/{TARGET}] Processando: {url}")
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(1500)
 
-            # Filtro para evitar perfil pessoal se for colab com autor externo exclusivo
+            # Valida autor para não puxar feed pessoal
             autor_header = page.query_selector("header")
             if autor_header:
-                txt_header = autor_header.inner_text().lower()
-                if "treinadorjhon" in txt_header and USER not in txt_header:
+                txt = autor_header.inner_text().lower()
+                if "treinadorjhon" in txt and USER not in txt:
                     print("  -> Post exclusivo do perfil pessoal detectado. Pulando...")
                     continue
 
@@ -97,11 +92,16 @@ def run():
             if meta_tag:
                 caption = meta_tag.get_attribute("content") or ""
 
+            # Verificação extra de texto para evitar posts fixados institucionais
+            if "há 3 anos" in caption.lower() or "be the 1%" in caption.lower() and "fase da champion" in caption.lower():
+                print("  -> Post institucional/fixado detectado por legenda. Pulando...")
+                continue
+
             sucesso = False
             arquivo_destino = None
             tipo = "image"
 
-            # 1. Vídeo
+            # 1. Tenta como vídeo
             if "/reel/" in url or page.query_selector("article video"):
                 nome_base = f"media_{slot}"
                 ydl_opts = {
@@ -127,7 +127,7 @@ def run():
                 except Exception:
                     sucesso = False
 
-            # 2. Imagem HD
+            # 2. Tenta como imagem HD
             if not sucesso:
                 tipo = "image"
                 arquivo_destino = f"media_{slot}.jpg"
@@ -157,7 +157,7 @@ def run():
             if sucesso and arquivo_destino and os.path.exists(arquivo_destino):
                 print(f"  -> Salvo slot {slot}: {arquivo_destino} ({tipo})")
                 dados_finais.append({
-                    "id": url.split("/")[-2],
+                    "id": code,
                     "url": url,
                     "caption": caption,
                     "tipo": tipo,
@@ -170,10 +170,11 @@ def run():
 
         browser.close()
 
+    # Salva json
     with open(DATA_JSON, "w", encoding="utf-8") as f:
         json.dump(dados_finais, f, indent=2, ensure_ascii=False)
 
-    print(f"\nFinalizado! Total de {len(dados_finais)} posts recentes sem fixados.")
+    print(f"\nFinalizado! Total de {len(dados_finais)} posts novos salvos (zero posts fixados).")
 
 if __name__ == "__main__":
     run()
