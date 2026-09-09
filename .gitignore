@@ -1,4 +1,3 @@
-﻿executar.bat
-baixar_mural.py
-cookies.txt
-.gitignore
+﻿__pycache__/
+*.pyc
+temp_*
