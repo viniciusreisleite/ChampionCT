@@ -8,6 +8,9 @@ ACCOUNTS = [
     {"username": "championct_", "badge": "CENTRO DE TREINAMENTO", "color": "#ff1744"}
 ]
 
+# Posts fixados do topo para ignorar
+SHORTCODES_FIXADOS = {"DalHQ6aRQor", "DVTXFY1jRa9", "DSqRcsEDsaY"}
+
 TARGET_TOTAL = 12
 POSTS_PER_ACCOUNT = 12
 DATA_JSON = "data.json"
@@ -26,7 +29,7 @@ def carregar_cache():
                 for item in dados:
                     url = item.get("url") or item.get("link", "")
                     sc = extrair_shortcode(url)
-                    if sc:
+                    if sc and sc not in SHORTCODES_FIXADOS:
                         cache[sc] = item
                 return cache
         except Exception:
@@ -48,7 +51,7 @@ def processar_mural():
     cache_local = carregar_cache()
     posts_a_manter = []
     
-    print("=== INICIANDO VERIFICAÇÃO RÁPIDA (INCREMENTAL) ===")
+    print("=== INICIANDO VERIFICAÇÃO RÁPIDA (SEM FIXADOS) ===")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -67,28 +70,34 @@ def processar_mural():
             page.goto(f"https://www.instagram.com/{usr}/", wait_until="domcontentloaded", timeout=60000)
             urls_encontradas = []
             
-            for _ in range(12):
+            for _ in range(16):
                 anchors = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
                 for a in anchors:
                     href = a.get_attribute("href")
                     if href:
+                        sc_check = extrair_shortcode(href)
+                        # IGNORA FIXADOS
+                        if sc_check in SHORTCODES_FIXADOS:
+                            continue
                         clean = href.split("?")[0].strip("/")
                         full = f"https://www.instagram.com/{clean}/"
                         if full not in urls_encontradas:
                             urls_encontradas.append(full)
-                if len(urls_encontradas) >= POSTS_PER_ACCOUNT + 4:
+                if len(urls_encontradas) >= POSTS_PER_ACCOUNT + 6:
                     break
                 page.evaluate("window.scrollBy(0, 1000)")
                 page.wait_for_timeout(500)
 
-            candidatos = urls_encontradas[:POSTS_PER_ACCOUNT + 4]
-            print(f"Posts no feed: {len(candidatos)} identificados.")
+            candidatos = urls_encontradas[:POSTS_PER_ACCOUNT + 6]
+            print(f"Posts no feed (sem fixados): {len(candidatos)} identificados.")
 
             for url in candidatos:
                 if len(posts_a_manter) >= TARGET_TOTAL:
                     break
 
                 sc = extrair_shortcode(url)
+                if sc in SHORTCODES_FIXADOS:
+                    continue
                 
                 # CHECAGEM DE CACHE
                 if sc in cache_local:
@@ -96,14 +105,13 @@ def processar_mural():
                     arquivo_salvo = item_cache.get("media") or item_cache.get("arquivo")
                     if arquivo_salvo and os.path.exists(arquivo_salvo):
                         print(f"  [CACHE OK] {sc} ({arquivo_salvo})")
-                        item_cache["media"] = arquivo_salvo
                         posts_a_manter.append(item_cache)
                         continue
 
                 # Se nao esta no cache, baixa apenas o novo post
                 print(f"  [NOVO POST] Baixando: {url}")
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_timeout(1000)
+                page.wait_for_timeout(1200)
 
                 caption = ""
                 meta_tag = page.query_selector('meta[property="og:title"]')
@@ -140,7 +148,6 @@ def processar_mural():
                         tipo = "image"
 
                 if tipo != "video":
-                    # Puxa imagem original completa (sem corte)
                     img_url = None
                     imgs = page.query_selector_all('article img[srcset], main img[srcset]')
                     for im in imgs:
@@ -159,6 +166,7 @@ def processar_mural():
                         baixar_imagem_hd(img_url, arquivo_final)
 
                 if os.path.exists(arquivo_final) and os.path.getsize(arquivo_final) > 5000:
+                    # Chaves completas para compatibilidade total com qualquer index.html
                     posts_a_manter.append({
                         "id": sc,
                         "url": url,
@@ -167,6 +175,8 @@ def processar_mural():
                         "type": tipo,
                         "tipo": tipo,
                         "media": arquivo_final,
+                        "media_file": arquivo_final,
+                        "video_file": arquivo_final,
                         "arquivo": arquivo_final,
                         "badge": badge,
                         "cor": cor,
@@ -191,13 +201,16 @@ def processar_mural():
             if os.path.exists(nome_slot):
                 os.remove(nome_slot)
             shutil.move(origem, nome_slot)
-            item["media"] = nome_slot
-            item["arquivo"] = nome_slot
+            
+        item["media"] = nome_slot
+        item["media_file"] = nome_slot
+        item["video_file"] = nome_slot
+        item["arquivo"] = nome_slot
 
         arquivos_preservados.add(nome_slot)
         dados_json_novo.append(item)
 
-    # Limpeza de arquivos antigos
+    # Limpeza de arquivos velhos
     for arq in os.listdir("."):
         if (arq.startswith("media_") or arq.startswith("temp_")) and (arq.endswith(".jpg") or arq.endswith(".mp4") or arq.endswith(".png")):
             if arq not in arquivos_preservados:
@@ -209,8 +222,7 @@ def processar_mural():
     with open(DATA_JSON, "w", encoding="utf-8") as f:
         json.dump(dados_json_novo, f, indent=2, ensure_ascii=False)
 
-    print(f"Concluído! {len(dados_json_novo)} mídias prontas e data.json 100% compatível com o index.html.")
+    print(f"Concluído! {len(dados_json_novo)} mídias prontas e sincronizadas.")
 
 if __name__ == "__main__":
     processar_mural()
-
