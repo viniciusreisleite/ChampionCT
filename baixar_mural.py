@@ -44,7 +44,7 @@ def run():
         page.wait_for_timeout(2500)
         
         candidatos_urls = []
-        for _ in range(20):
+        for _ in range(40):
             links = page.query_selector_all('a[href*="/p/"], a[href*="/reel/"]')
             for l in links:
                 h = l.get_attribute("href")
@@ -60,7 +60,7 @@ def run():
                         if full_url not in candidatos_urls:
                             candidatos_urls.append(full_url)
 
-            if len(candidatos_urls) >= 22:
+            if len(candidatos_urls) >= 30:
                 break
             page.evaluate("window.scrollBy(0, 1200)")
             page.wait_for_timeout(600)
@@ -178,3 +178,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+
