@@ -119,7 +119,7 @@ def processar_mural():
                 if video_elem or "/reel/" in url:
                     ydl_opts = {
                         'outtmpl': f'{post_temp_id}.%(ext)s',
-                        'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best',
+                        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
                         'socket_timeout': 15,
                         'retries': 3,
                         'fragment_retries': 3,
@@ -213,3 +213,4 @@ def processar_mural():
 
 if __name__ == "__main__":
     processar_mural()
+
