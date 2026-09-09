@@ -11,11 +11,8 @@ echo.
 echo 2. Enviando para o repositorio GitHub...
 git add -A
 
-git diff-index --quiet HEAD || git commit -m "Atualizacao automatica mural"
+git diff-index --quiet HEAD || git commit -m "Atualizacao automatica mural ChampionCT"
 git push origin main
 
 echo.
-
-
-
 echo Concluido!
