@@ -51,8 +51,7 @@
       height: 100% !important;
       object-fit: contain !important;
       border-radius: 24px !important;
-      display: block !important;
-    }
+      }
 
     /* QUANDO FOR FOTO (1:1 ou 4:5): foto 100% inteira sem zoom e sem cortar laterais */
     .tv-container.is-image .video-section {
@@ -66,8 +65,7 @@
       height: 100% !important;
       object-fit: contain !important;
       border-radius: 20px !important;
-      display: block !important;
-    }
+      }
 
     .info-section {
       flex: 1;
@@ -262,7 +260,8 @@
 
             if (player) {
               player.pause();
-              player.style.display = 'none';
+              player.removeAttribute('src');
+              player.style.setProperty('display', 'none', 'important');
             }
             if (imagePlayer) {
               imagePlayer.style.display = 'block';
