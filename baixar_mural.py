@@ -136,8 +136,8 @@ def main():
         browser.close()
 
     if len(posts_a_manter) < 6:
-        print(f"Poucas midias obtidas ({len(posts_a_manter)}). Mantendo grade atual.")
-        return
+        print(f"ERRO: poucas midias obtidas ({len(posts_a_manter)}). Grade atual preservada.")
+        sys.exit(3)
 
     json_final = []
     for idx, post in enumerate(posts_a_manter, 1):
