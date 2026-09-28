@@ -2,6 +2,10 @@ name: Sincronizar Instagram - Champion CT
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync.yml"
 
 permissions:
   contents: write
@@ -11,6 +15,9 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Baixar repositório
@@ -58,4 +65,5 @@ jobs:
           path: '.'
 
       - name: Publicar Painel na Web
+        id: deployment
         uses: actions/deploy-pages@v4
