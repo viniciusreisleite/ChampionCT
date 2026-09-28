@@ -43,6 +43,7 @@ if errorlevel 1 (
 echo.
 echo 2. Preparando alteracoes...
 git add -A
+git reset -q HEAD -- cookies.txt >nul 2>nul
 git diff --cached --quiet
 if not errorlevel 1 (
     git commit -m "Atualizacao manual mural ChampionCT"
